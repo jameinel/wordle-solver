@@ -4,10 +4,9 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/jameinel/wordle-solver/words"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-
-	"github.com/jameinel/wordle-solver/words"
 )
 
 func main() {
@@ -39,8 +38,22 @@ func main() {
 
 	solveCmd.Flags().StringP("file", "f", "", "Input JSON file")
 	_ = viper.BindPFlag("file", solveCmd.Flags().Lookup("file"))
-
 	rootCmd.AddCommand(solveCmd)
+
+	var seed int64
+	var generateCmd = &cobra.Command{
+		Use:   "generate",
+		Short: "Generate a small_words.json with random 10% of La and Ta (optionally seeded)",
+		Run: func(cmd *cobra.Command, args []string) {
+			if seed == 0 {
+				seed = cryptoSeed()
+			}
+			generateSmallWords(seed)
+		},
+	}
+
+	generateCmd.Flags().Int64Var(&seed, "seed", 0, "Seed for random number generator (default 0)")
+	rootCmd.AddCommand(generateCmd)
 
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
