@@ -12,7 +12,7 @@ import (
 	"github.com/jameinel/wordle-solver/words"
 )
 
-func generateSmallWords(seed int64) {
+func generateSmallWords(seed int64, fraction float64) {
 	inFile := "words/words.json"
 	outFile := "words/small_words.json"
 
@@ -23,8 +23,8 @@ func generateSmallWords(seed int64) {
 	}
 	r := rand.New(rand.NewSource(seed))
 	outWords := &words.Words{
-		Solutions:  grab10Percent(r, allWords.Solutions),
-		Dictionary: grab10Percent(r, allWords.Dictionary),
+		Solutions:  grabFraction(r, allWords.Solutions, fraction),
+		Dictionary: grabFraction(r, allWords.Dictionary, fraction),
 	}
 	out, err := json.MarshalIndent(outWords, "", "  ")
 	if err != nil {
@@ -39,8 +39,8 @@ func generateSmallWords(seed int64) {
 	fmt.Printf("Generated %s\n", outFile)
 }
 
-func grab10Percent(r *rand.Rand, arr []string) []string {
-	n := int(math.Floor(float64(len(arr)) * 0.1))
+func grabFraction(r *rand.Rand, arr []string, fraction float64) []string {
+	n := int(math.Floor(float64(len(arr)) * fraction))
 	if n < 1 {
 		n = 1
 	}

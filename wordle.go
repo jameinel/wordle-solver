@@ -41,6 +41,7 @@ func main() {
 	rootCmd.AddCommand(solveCmd)
 
 	var seed int64
+	var fraction float64
 	var generateCmd = &cobra.Command{
 		Use:   "generate",
 		Short: "Generate a small_words.json with random 10% of La and Ta (optionally seeded)",
@@ -48,11 +49,12 @@ func main() {
 			if seed == 0 {
 				seed = cryptoSeed()
 			}
-			generateSmallWords(seed)
+			generateSmallWords(seed, fraction)
 		},
 	}
 
 	generateCmd.Flags().Int64Var(&seed, "seed", 0, "Seed for random number generator (default 0)")
+	generateCmd.Flags().Float64Var(&fraction, "fraction", 0.1, "Fraction of words to include (default 0.1)")
 	rootCmd.AddCommand(generateCmd)
 
 	if err := rootCmd.Execute(); err != nil {
