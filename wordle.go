@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/jameinel/wordle-solver/words"
 	"github.com/spf13/cobra"
@@ -11,7 +12,7 @@ import (
 
 func main() {
 	var rootCmd = &cobra.Command{
-		Use:   "wordle",
+		Use:   "wordle-solver",
 		Short: "Simple wordle solver.",
 		Long:  "A wordle solver that attempts to extend the information theorem methods that pick any word, to one that is aware of hard mode",
 	}
@@ -57,7 +58,36 @@ func main() {
 	generateCmd.Flags().Float64Var(&fraction, "fraction", 0.1, "Fraction of words to include (default 0.1)")
 	rootCmd.AddCommand(generateCmd)
 
+	var matchesCmd = &cobra.Command{
+		Use:   "matches",
+		Short: "Compute packed matches between all words",
+		Run: func(cmd *cobra.Command, args []string) {
+			filename := viper.GetString("file")
+			if filename == "" {
+				fmt.Println("No filename provided. Use --file or -f to specify the input file.")
+				os.Exit(1)
+			}
+			allWords, err := words.ReadWordsFile(filename)
+			if err != nil {
+				fmt.Printf("Error reading words: %v\n", err)
+				os.Exit(1)
+			}
+
+			wordMap := words.AllWordsToWordMap(allWords)
+
+			tStart := time.Now()
+			allMatches := words.GetAllWordMatches(wordMap)
+
+			fmt.Printf("Computed %d matches in %s:\n", len(allMatches.ExactPackedMatch), time.Since(tStart))
+		},
+	}
+
+	matchesCmd.Flags().StringP("file", "f", "", "Input JSON file")
+	_ = viper.BindPFlag("file", matchesCmd.Flags().Lookup("file"))
+	rootCmd.AddCommand(matchesCmd)
+
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
 	}
+
 }
