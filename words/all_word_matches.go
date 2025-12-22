@@ -19,6 +19,30 @@ type allResult struct {
 	exactMatch uint8
 }
 
+func processIthWords(i int, words []string) []allResult {
+	results := make([]allResult, 0, len(words)-i-1)
+	a := words[i]
+	for j := i + 1; j < len(words); j++ {
+		// fmt.Printf("%d,%d\n", ii, j)
+		b := words[j]
+		key := (uint32(i) << 16) | uint32(j)
+		packed, exactPacked := GetPackedMatches(a, b)
+		key2 := (uint32(j) << 16) | uint32(i)
+		packed2, exactPacked2 := GetPackedMatches(b, a)
+		if exactPacked2 != exactPacked {
+			panic("exact packed match should be symmetric")
+		}
+		results = append(results, allResult{
+			key:        key,
+			key2:       key2,
+			match:      packed,
+			match2:     packed2,
+			exactMatch: exactPacked,
+		})
+	}
+	return results
+}
+
 func GetAllWordMatches(wordMap *WordMap) *AllWordMatches {
 	// (n) * (n-1)/2*2 because we track both (i,j) and (j,i), but we don't track (i,i)
 	expectedLen := len(wordMap.Words) * (len(wordMap.Words) - 1)
@@ -26,48 +50,31 @@ func GetAllWordMatches(wordMap *WordMap) *AllWordMatches {
 	matches := make(map[uint32]uint8, expectedLen)
 	// Exact matches are symmetric so we only store the (i,j) where i<j
 	exactMatches := make(map[uint32]uint8, len(wordMap.Words))
-	resultChan := make(chan allResult)
+	words := wordMap.Words
+	results := make(chan []allResult)
 	done := make(chan struct{})
 	wg := sync.WaitGroup{}
+
 	go func() {
-		for res := range resultChan {
-			// i := res.key >> 16
-			// j := res.key & 0xFFFF
-			// ii := res.key2 >> 16
-			// jj := res.key2 & 0xFFFF
-			// fmt.Printf("%05x i=%d j=%d %05x ii=%d, jj=%d\n", res.key, i, j, res.key2, ii, jj)
-			matches[res.key] = res.match
-			matches[res.key2] = res.match2
-			exactMatches[res.key] = res.exactMatch
+		for res := range results {
+			for _, r := range res {
+				matches[r.key] = r.match
+				matches[r.key2] = r.match2
+				exactMatches[r.key] = r.exactMatch
+			}
 		}
 		close(done)
 	}()
-	for i := 0; i < len(wordMap.Words); i++ {
+	for i := 0; i < len(words); i++ {
 		wg.Add(1)
-		go func(ii int, a string, words []string) {
-			defer wg.Done()
-			for j := ii + 1; j < len(words); j++ {
-				// fmt.Printf("%d,%d\n", ii, j)
-				b := words[j]
-				key := (uint32(ii) << 16) | uint32(j)
-				packed, exactPacked := GetPackedMatches(a, b)
-				key2 := (uint32(j) << 16) | uint32(ii)
-				packed2, exactPacked2 := GetPackedMatches(b, a)
-				if exactPacked2 != exactPacked {
-					panic("exact packed match should be symmetric")
-				}
-				resultChan <- allResult{
-					key:        key,
-					key2:       key2,
-					match:      packed,
-					match2:     packed2,
-					exactMatch: exactPacked,
-				}
-			}
-		}(i, wordMap.Words[i], wordMap.Words)
+		go func(ii int) {
+			res := processIthWords(ii, words)
+			results <- res
+			wg.Done()
+		}(i)
 	}
 	wg.Wait()
-	close(resultChan)
+	close(results)
 	<-done
 
 	if len(matches) != expectedLen {
@@ -98,20 +105,51 @@ type AllSmallWordMatches struct {
 	Matches map[uint32]uint8
 }
 
+type smallResult struct {
+	key   uint32
+	match uint8
+}
+
 func GetAllSmallWordMatches(wordMap *SmallWordMap) *AllSmallWordMatches {
 	// Exact matches are symmetric so we only store the (i,j) where i<j
 	expectedLen := len(wordMap.Words) * (len(wordMap.Words) - 1) / 2
 	matches := make(map[uint32]uint8, expectedLen)
 	words := wordMap.SmallWords
-	for i := 0; i < len(words); i++ {
-		a := words[i]
-		for j := i + 1; j < len(words); j++ {
-			b := words[j]
-			match := MatchPackedWords(a, b)
-			key := (uint32(i) << 16) | uint32(j)
-			matches[key] = match
+	results := make(chan []smallResult)
+	done := make(chan struct{})
+	wg := sync.WaitGroup{}
+
+	go func() {
+		for res := range results {
+			for _, r := range res {
+				matches[r.key] = r.match
+			}
 		}
+		close(done)
+	}()
+
+	for i := 0; i < len(words); i++ {
+		wg.Add(1)
+		go func(ii int) {
+			res := make([]smallResult, 0, len(words)-ii-1)
+			a := words[ii]
+			for j := ii + 1; j < len(words); j++ {
+				b := words[j]
+				match := MatchPackedWords(a, b)
+				key := (uint32(i) << 16) | uint32(j)
+				res = append(res, smallResult{
+					key:   key,
+					match: match,
+				})
+			}
+			results <- res
+			wg.Done()
+		}(i)
 	}
+	wg.Wait()
+	close(results)
+	<-done
+
 	if len(matches) != expectedLen {
 		panic("unexpected number of matches computed")
 	}
