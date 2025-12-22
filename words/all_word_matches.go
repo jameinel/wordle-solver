@@ -27,6 +27,7 @@ func GetAllWordMatches(wordMap *WordMap) *AllWordMatches {
 	// Exact matches are symmetric so we only store the (i,j) where i<j
 	exactMatches := make(map[uint32]uint8, len(wordMap.Words))
 	resultChan := make(chan allResult)
+	done := make(chan struct{})
 	wg := sync.WaitGroup{}
 	go func() {
 		for res := range resultChan {
@@ -39,6 +40,7 @@ func GetAllWordMatches(wordMap *WordMap) *AllWordMatches {
 			matches[res.key2] = res.match2
 			exactMatches[res.key] = res.exactMatch
 		}
+		close(done)
 	}()
 	for i := 0; i < len(wordMap.Words); i++ {
 		wg.Add(1)
@@ -66,6 +68,7 @@ func GetAllWordMatches(wordMap *WordMap) *AllWordMatches {
 	}
 	wg.Wait()
 	close(resultChan)
+	<-done
 
 	if len(matches) != expectedLen {
 		panic(fmt.Sprintf("expected %d matches got %d", expectedLen, len(matches)))
