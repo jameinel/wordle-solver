@@ -1,6 +1,9 @@
 package words
 
-import "strings"
+import (
+	"sort"
+	"strings"
+)
 
 type SmallWordMap struct {
 	Words      []string
@@ -77,13 +80,10 @@ func MatchPackedWords(a, b uint32) uint8 {
 	return uint8(((tmp * multiplier) >> 27) & 0x1F)
 }
 
-func MatchPackedBytes(a, b uint32) (uint32, uint8) {
-	var a_xor_b uint32 = (a ^ b)
-	ltmp := a_xor_b | ((0xf0f0f0f0 & a_xor_b) >> 4)
-	ltmp &= 0x0f0f0f0f
-	ltmp = ltmp | (ltmp >> 2)
-	ltmp = ltmp | (ltmp >> 1)
-	ltmp &= 0x01010101
-	// if any of the bits were set in each byte, then the lsb will be 1
-	return 0x01010101 - ltmp, 0
+func AllWordsToSmallWordMap(allWords *Words) *SmallWordMap {
+	combined := make([]string, len(allWords.Solutions)+len(allWords.Dictionary))
+	copy(combined, allWords.Solutions)
+	copy(combined[len(allWords.Solutions):], allWords.Dictionary)
+	sort.Strings(combined)
+	return NewSmallWordMap(combined)
 }

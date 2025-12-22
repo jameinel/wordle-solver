@@ -86,6 +86,53 @@ func main() {
 	_ = viper.BindPFlag("file", matchesCmd.Flags().Lookup("file"))
 	rootCmd.AddCommand(matchesCmd)
 
+	var exactMatchesCmd = &cobra.Command{
+		Use:   "exact-matches",
+		Short: "Compute exact matches between all words",
+		Run: func(cmd *cobra.Command, args []string) {
+			filename := viper.GetString("file")
+			if filename == "" {
+				fmt.Println("No filename provided. Use --file or -f to specify the input file.")
+				os.Exit(1)
+			}
+			allWords, err := words.ReadWordsFile(filename)
+			if err != nil {
+				fmt.Printf("Error reading words: %v\n", err)
+				os.Exit(1)
+			}
+
+			wordMap := words.AllWordsToWordMap(allWords)
+			smallWordMap := words.AllWordsToSmallWordMap(allWords)
+
+			tStart := time.Now()
+			smallWordMatches := words.GetAllSmallWordMatches(smallWordMap)
+			tSmallMatches := time.Now()
+			fmt.Printf("Computed %d small matches in %s\n", len(smallWordMatches.Matches), tSmallMatches.Sub(tStart))
+			allMatches := words.GetAllWordMatches(wordMap)
+			fmt.Printf("Computed %d all matches and %d exact matches in %s\n", len(allMatches.PackedMatch), len(allMatches.ExactPackedMatch), time.Since(tSmallMatches))
+			if len(allMatches.ExactPackedMatch) != len(smallWordMatches.Matches) {
+				fmt.Printf("Mismatch in number of exact matches: all=%d vs small=%d\n", len(allMatches.ExactPackedMatch), len(smallWordMatches.Matches))
+				os.Exit(1)
+			}
+			for key, match := range smallWordMatches.Matches {
+				allMatch := allMatches.ExactPackedMatch[key]
+				if match != allMatch {
+					i := uint16((key >> 16) & 0xFFFF)
+					j := uint16(key & 0xFFFF)
+					a := smallWordMap.Words[i]
+					b := smallWordMap.Words[j]
+					fmt.Printf("Mismatch in exact match for %q vs %q: all=%d vs small=%d\n", a, b, allMatch, match)
+					os.Exit(1)
+				}
+			}
+			fmt.Printf("All exact matches verified between small and all word maps.\n")
+		},
+	}
+
+	exactMatchesCmd.Flags().StringP("file", "f", "", "Input JSON file")
+	_ = viper.BindPFlag("file", exactMatchesCmd.Flags().Lookup("file"))
+	rootCmd.AddCommand(exactMatchesCmd)
+
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
 	}

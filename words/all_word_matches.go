@@ -1,37 +1,74 @@
 package words
 
+import (
+	"fmt"
+	"sync"
+)
+
 type AllWordMatches struct {
 	Words            *WordMap
 	PackedMatch      map[uint32]uint8
 	ExactPackedMatch map[uint32]uint8
 }
 
+type allResult struct {
+	key        uint32
+	key2       uint32
+	match      uint8
+	match2     uint8
+	exactMatch uint8
+}
+
 func GetAllWordMatches(wordMap *WordMap) *AllWordMatches {
+	// (n) * (n-1)/2*2 because we track both (i,j) and (j,i), but we don't track (i,i)
 	expectedLen := len(wordMap.Words) * (len(wordMap.Words) - 1)
 	// Track all matches from a to b, and b to a, but ignore (i,i) since those are all exact matches
 	matches := make(map[uint32]uint8, expectedLen)
 	// Exact matches are symmetric so we only store the (i,j) where i<j
 	exactMatches := make(map[uint32]uint8, len(wordMap.Words))
-	words := wordMap.Words
-	for i := 0; i < len(words); i++ {
-		a := words[i]
-		for j := i + 1; j < len(words); j++ {
-			b := words[j]
-			packed, exactPacked := GetPackedMatches(a, b)
-			key := (uint32(i) << 16) | uint32(j)
-			// Combine the two packed matches into a single byte
-			matches[key] = packed
-			exactMatches[key] = exactPacked
-			packed2, exactPacked2 := GetPackedMatches(b, a)
-			if exactPacked2 != exactPacked {
-				panic("exact packed match should be symmetric")
-			}
-			key2 := (uint32(j) << 16) | uint32(i)
-			matches[key2] = packed2
+	resultChan := make(chan allResult)
+	wg := sync.WaitGroup{}
+	go func() {
+		for res := range resultChan {
+			// i := res.key >> 16
+			// j := res.key & 0xFFFF
+			// ii := res.key2 >> 16
+			// jj := res.key2 & 0xFFFF
+			// fmt.Printf("%05x i=%d j=%d %05x ii=%d, jj=%d\n", res.key, i, j, res.key2, ii, jj)
+			matches[res.key] = res.match
+			matches[res.key2] = res.match2
+			exactMatches[res.key] = res.exactMatch
 		}
+	}()
+	for i := 0; i < len(wordMap.Words); i++ {
+		wg.Add(1)
+		go func(ii int, a string, words []string) {
+			defer wg.Done()
+			for j := ii + 1; j < len(words); j++ {
+				// fmt.Printf("%d,%d\n", ii, j)
+				b := words[j]
+				key := (uint32(ii) << 16) | uint32(j)
+				packed, exactPacked := GetPackedMatches(a, b)
+				key2 := (uint32(j) << 16) | uint32(ii)
+				packed2, exactPacked2 := GetPackedMatches(b, a)
+				if exactPacked2 != exactPacked {
+					panic("exact packed match should be symmetric")
+				}
+				resultChan <- allResult{
+					key:        key,
+					key2:       key2,
+					match:      packed,
+					match2:     packed2,
+					exactMatch: exactPacked,
+				}
+			}
+		}(i, wordMap.Words[i], wordMap.Words)
 	}
+	wg.Wait()
+	close(resultChan)
+
 	if len(matches) != expectedLen {
-		panic("unexpected number of matches computed")
+		panic(fmt.Sprintf("expected %d matches got %d", expectedLen, len(matches)))
 	}
 	return &AllWordMatches{
 		Words:            wordMap,
@@ -51,4 +88,32 @@ func (awm *AllWordMatches) Match(i, j uint16) (uint8, uint8) {
 	}
 	exactPacked := awm.ExactPackedMatch[key]
 	return packed, exactPacked
+}
+
+type AllSmallWordMatches struct {
+	Words   *SmallWordMap
+	Matches map[uint32]uint8
+}
+
+func GetAllSmallWordMatches(wordMap *SmallWordMap) *AllSmallWordMatches {
+	// Exact matches are symmetric so we only store the (i,j) where i<j
+	expectedLen := len(wordMap.Words) * (len(wordMap.Words) - 1) / 2
+	matches := make(map[uint32]uint8, expectedLen)
+	words := wordMap.SmallWords
+	for i := 0; i < len(words); i++ {
+		a := words[i]
+		for j := i + 1; j < len(words); j++ {
+			b := words[j]
+			match := MatchPackedWords(a, b)
+			key := (uint32(i) << 16) | uint32(j)
+			matches[key] = match
+		}
+	}
+	if len(matches) != expectedLen {
+		panic("unexpected number of matches computed")
+	}
+	return &AllSmallWordMatches{
+		Words:   wordMap,
+		Matches: matches,
+	}
 }

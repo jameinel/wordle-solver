@@ -78,28 +78,6 @@ func TestMatchPackedWords(t *testing.T) {
 	}
 }
 
-func TestMatchPackedBytes(t *testing.T) {
-	tests := []struct {
-		a, b  uint32
-		wide  uint32
-		small uint8
-	}{
-		{0x01_00_00_00, 0x00_00_02_04, 0x00_01_00_00, 0x00},
-		{0x01_02_04_08, 0x01_02_04_08, 0x01_01_01_01, 0x00},
-		{0x03_02_06_0A, 0x01_02_04_08, 0x00_01_00_00, 0x00},
-		{0x21_02_23_24, 0x01_02_03_04, 0x00_01_00_00, 0x00},
-	}
-	for _, tt := range tests {
-		t.Run(fmt.Sprintf("0x%X vs 0x%X", tt.a, tt.b), func(t *testing.T) {
-			wide, small := MatchPackedBytes(tt.a, tt.b)
-			if wide != tt.wide { // || small != tt.small {
-				t.Errorf("Matching 0x%X vs 0x%X:\nwant wide=0x%08X small=0x%04X\n got wide=0x%08X small=0x%04X",
-					tt.a, tt.b, tt.wide, tt.small, wide, small)
-			}
-		})
-	}
-}
-
 func TestNewSmallWordMap(t *testing.T) {
 	words := []string{"apple", "aplep", "pleap", "zzzzz"}
 	ints := []uint32{
