@@ -34,21 +34,24 @@ func GetWordMatches(test, goal string) []LetterMatch {
 		return nil
 	}
 	matches := make([]LetterMatch, len(test))
-	unused := make(map[uint8]int)
+	// unused := make(map[uint8]int)
+	var unused [26]uint8
 	for i := 0; i < len(goal); i++ {
 		c := goal[i]
 		if c == test[i] {
 			matches[i] = MatchExact
 		} else {
-			unused[c] = unused[c] + 1
+			cc := c - 'a'
+			unused[cc] = unused[cc] + 1
 		}
 	}
 	for i := 0; i < len(test); i++ {
 		c := test[i]
 		if c != goal[i] {
-			if count, ok := unused[c]; ok && count > 0 {
+			cc := c - 'a'
+			if count := unused[cc]; count > 0 {
 				matches[i] = MatchNear
-				unused[c] = count - 1
+				unused[cc] = count - 1
 			} else {
 				matches[i] = MatchNone
 			}

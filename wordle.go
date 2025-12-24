@@ -109,7 +109,7 @@ func main() {
 			tSmallMatches := time.Now()
 			fmt.Printf("Computed %d small matches in %s\n", len(smallWordMatches.Matches), tSmallMatches.Sub(tStart))
 			allMatches := words.GetAllWordMatches(wordMap)
-			fmt.Printf("Computed %d all matches and %d exact matches in %s\n", len(allMatches.PackedMatch), len(allMatches.ExactPackedMatch), time.Since(tSmallMatches))
+			fmt.Printf("Computed %d all matches and %d exact matches in %s\n", allMatches.PackedMatch.Len(), len(allMatches.ExactPackedMatch), time.Since(tSmallMatches))
 			if len(allMatches.ExactPackedMatch) != len(smallWordMatches.Matches) {
 				fmt.Printf("Mismatch in number of exact matches: all=%d vs small=%d\n", len(allMatches.ExactPackedMatch), len(smallWordMatches.Matches))
 				os.Exit(1)
