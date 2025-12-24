@@ -6,14 +6,14 @@ import (
 
 type WordMap struct {
 	Words   []string
-	Offsets map[string]uint16
+	Offsets map[string]int16
 }
 
 func NewWordMap(words []string) *WordMap {
 	// TODO: do we want to vet that the words are all 5 letters
-	offsets := make(map[string]uint16)
+	offsets := make(map[string]int16)
 	for i, word := range words {
-		offsets[word] = uint16(i)
+		offsets[word] = int16(i)
 	}
 	return &WordMap{
 		Words:   words,
