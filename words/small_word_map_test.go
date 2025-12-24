@@ -7,38 +7,26 @@ import (
 )
 
 func TestPackUnpackRoundTrip(t *testing.T) {
-	// letter bits
-	// 0b0_00000_00000_00000_00000_00000
-	//   z_yxwvu_tsrqp_onmlk_jihg_fedcba
 	tests := []struct {
 		word   string
 		packed uint32
-		bits   uint32
-		chars  string
 	}{
-		{"aaaaa", 0b000001_000001_000001_000001_000001, 0b0_00000_00000_00000_00000_00001, "a"},
-		{"hello", 0b001000_000101_001100_001100_001111, 0b0_00000_00000_10010_00100_10000, "ehlo"},
-		{"gamer", 0b000111_000001_001101_000101_010010, 0b0_00000_00100_00100_00010_10001, "aegmr"},
-		{"speed", 0b010011_010000_000101_000101_000100, 0b0_00000_01001_00000_00000_11000, "deps"},
-		{"think", 0b010100_001000_001001_001110_001011, 0b0_00000_10000_01001_01100_00000, "hiknt"},
+		{"aaaaa", 0b000001_000001_000001_000001_000001},
+		{"hello", 0b001000_000101_001100_001100_001111},
+		{"gamer", 0b000111_000001_001101_000101_010010},
+		{"speed", 0b010011_010000_000101_000101_000100},
+		{"think", 0b010100_001000_001001_001110_001011},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.word, func(t *testing.T) {
-			packed, bits := packWordToUint32(tt.word)
+			packed := packWordToUint32(tt.word)
 			unpacked := unpackWordFromUint32(packed)
-			chars := lettersFromBits(bits)
 			if unpacked != tt.word {
 				t.Errorf("Round-trip for %q failed: got %q", tt.word, unpacked)
 			}
 			if packed != tt.packed {
 				t.Errorf("Packing %q: expected 0b%030b, got 0b%030b", tt.word, tt.packed, packed)
-			}
-			if bits != tt.bits {
-				t.Errorf("Bits from %q: expected 0b%030b, got 0b%030b", tt.word, tt.bits, bits)
-			}
-			if chars != tt.chars {
-				t.Errorf("Letters from bits for %q: expected %q, got %q", tt.word, tt.chars, chars)
 			}
 		})
 	}
@@ -71,7 +59,7 @@ func TestMatchPackedWords(t *testing.T) {
 		{"abcde", "abxyz", 0b11000},
 		{"abcde", "xyzde", 0b00011},
 		{"axxxx", "ayyyy", 0b10000},
-		{"xaxxx", "yayyy", 0b01000},
+		{"baxxx", "cayyy", 0b01000},
 		{"xxaxx", "yyayy", 0b00100},
 		{"xxxax", "yyyay", 0b00010},
 		{"xxxxa", "yyyya", 0b00001},
@@ -79,8 +67,8 @@ func TestMatchPackedWords(t *testing.T) {
 	b2s := formatBinarySixesWithUnderscores
 	for _, tt := range tests {
 		t.Run(fmt.Sprintf("%s vs %s", tt.a, tt.b), func(t *testing.T) {
-			packedA, _ := packWordToUint32(tt.a)
-			packedB, _ := packWordToUint32(tt.b)
+			packedA := packWordToUint32(tt.a)
+			packedB := packWordToUint32(tt.b)
 			narrow := MatchPackedWords(packedA, packedB)
 			if narrow != tt.matches { // || narrow != tt.matches
 				t.Errorf("Matching %q vs %q: want: 0b%05b\n got: 0b%05b\n  pA: 0b%s\n  pB: 0b%s",
