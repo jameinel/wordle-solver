@@ -141,6 +141,9 @@ func GetAllSmallWordMatches(wordMap *SmallWordMap) *AllSmallWordMatches {
 					key:   key,
 					match: match,
 				})
+				missedA, missedB := FindMisses(a, b, match)
+				_ = missedA
+				_ = missedB
 			}
 			results <- res
 			wg.Done()
@@ -157,4 +160,58 @@ func GetAllSmallWordMatches(wordMap *SmallWordMap) *AllSmallWordMatches {
 		Words:   wordMap,
 		Matches: matches,
 	}
+}
+
+func maskMatchedLetters(match uint8) uint32 {
+	var mask uint32
+	// Map bit 0 to bit 0-5, bit 1 to 6-11, bit 2 to 12-17, bit 3 to 18-23, bit 4 to 24-29
+	mask = uint32(match)
+	mask = 0 |
+		((mask & 0x10) << 20) |
+		((mask & 0x08) << 15) |
+		((mask & 0x04) << 10) |
+		((mask & 0x02) << 5) |
+		((mask & 0x01) << 0)
+	mask *= 0x3F
+	return (^mask) & 0x3FFFFFFF
+}
+
+func FindMisses(packedA, packedB uint32, match uint8) (uint8, uint8) {
+	mask := maskMatchedLetters(match)
+	unmatchedA := packedA & mask
+	unmatchedB := packedB & mask
+	unusedA := make(map[uint8]int)
+	unusedB := make(map[uint8]int)
+	for i := 0; i < 5; i++ {
+		c := uint8(unmatchedA>>(6*i)) & 0x3F
+		if c != 0 {
+			unusedA[c] = unusedA[c] + 1
+		}
+		c = uint8(unmatchedB>>(6*i)) & 0x3F
+		if c != 0 {
+			unusedB[c] = unusedB[c] + 1
+		}
+	}
+	var missesA, missesB uint8
+	for i := 4; i >= 0; i-- {
+		missesA <<= 1
+		c := uint8(unmatchedA>>(6*i)) & 0x3F
+		if c != 0 {
+			count := unusedB[c]
+			if count > 0 {
+				unusedB[c] = count - 1
+				missesA |= 1
+			}
+		}
+		missesB <<= 1
+		c = uint8(unmatchedB>>(6*i)) & 0x3F
+		if c != 0 {
+			count := unusedA[c]
+			if count > 0 {
+				unusedA[c] = count - 1
+				missesB |= 1
+			}
+		}
+	}
+	return missesA, missesB
 }
